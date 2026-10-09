@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube to Facebook Reels Generator (9:16)</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">🎬</div>
+        <div>
+          <h1>YouTube to Reels 9:16</h1>
+          <p class="subtitle">Auto Split &amp; Cinematic Portrait Converter untuk Facebook Reels</p>
+        </div>
+      </div>
+      <div class="system-status">
+        {% if ffmpeg_available %}
+        <span class="badge badge-success">● FFmpeg Siap</span>
+        {% else %}
+        <span class="badge badge-danger">✕ FFmpeg Tidak Ditemukan</span>
+        {% endif %}
+      </div>
+    </header>
+
+    {% if not ffmpeg_available %}
+    <div class="alert alert-danger">
+      <strong>Peringatan Sistem:</strong> FFmpeg belum terdeteksi di perangkat Anda. Silakan pasang FFmpeg dengan perintah <code>pkg install ffmpeg</code> (Termux) atau <code>sudo apt install ffmpeg</code> (Linux).
+    </div>
+    {% endif %}
+
+    <!-- Step 1: Input URL -->
+    <section class="card step-card">
+      <div class="card-header">
+        <span class="step-num">1</span>
+        <h2>Masukkan Video YouTube</h2>
+      </div>
+      <div class="card-body">
+        <div class="input-group">
+          <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=... atau https://youtu.be/..." autocomplete="off">
+          <button id="btnFetchInfo" class="btn btn-primary">
+            <span class="btn-icon">🔍</span> Ambil Video
+          </button>
+        </div>
+        <p class="input-hint">Mendukung link video reguler maupun YouTube Shorts.</p>
+      </div>
+    </section>
+
+    <!-- Step 2: Video Metadata & Preview Card -->
+    <section id="videoPreviewCard" class="card hidden">
+      <div class="card-header">
+        <span class="step-num">2</span>
+        <h2>Informasi Video Sumber</h2>
+      </div>
+      <div class="card-body">
+        <div class="video-info-grid">
+          <div class="thumbnail-container">
+            <img id="previewThumb" src="" alt="Thumbnail Video">
+            <div id="previewDurationBadge" class="duration-badge">00:00</div>
+          </div>
+          <div class="video-meta-details">
+            <h3 id="previewTitle" class="video-title">Judul Video</h3>
+            <div class="meta-row">
+              <span class="meta-label">Channel:</span>
+              <span id="previewChannel" class="meta-value">-</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Durasi Asli:</span>
+              <span id="previewDuration" class="meta-value">-</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">Resolusi Sumber:</span>
+              <span id="previewResolution" class="meta-value badge badge-info">-</span>
+            </div>
+            <div class="meta-row quality-selector">
+              <label for="downloadQuality" class="meta-label">Kualitas Unduh:</label>
+              <select id="downloadQuality" class="form-select">
+                <option value="best">Kualitas Terbaik (Default)</option>
+                <option value="1080p">1080p (Full HD)</option>
+                <option value="720p">720p (HD)</option>
+                <option value="480p">480p (SD - Lebih Cepat)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 3: Pengaturan Pemotongan & Mode Portrait -->
+    <section id="settingsCard" class="card hidden">
+      <div class="card-header">
+        <span class="step-num">3</span>
+        <h2>Pengaturan Klip &amp; Portrait 9:16</h2>
+      </div>
+      <div class="card-body">
+        <!-- Durasi Klip -->
+        <div class="setting-section">
+          <label class="section-label">Durasi Setiap Klip Reels:</label>
+          <div class="duration-pills">
+            <label class="pill-radio">
+              <input type="radio" name="clipDurationRadio" value="30">
+              <span class="pill-text">30 Detik</span>
+            </label>
+            <label class="pill-radio">
+              <input type="radio" name="clipDurationRadio" value="45">
+              <span class="pill-text">45 Detik</span>
+            </label>
+            <label class="pill-radio">
+              <input type="radio" name="clipDurationRadio" value="60" checked>
+              <span class="pill-text">60 Detik</span>
+            </label>
+            <label class="pill-radio">
+              <input type="radio" name="clipDurationRadio" value="custom">
+              <span class="pill-text">Custom</span>
+            </label>
+          </div>
+          <div id="customDurationBox" class="custom-duration-input hidden">
+            <label for="customDurationVal">Durasi Kustom (detik):</label>
+            <input type="number" id="customDurationVal" min="5" max="300" value="60">
+          </div>
+          <div id="clipCalculationBanner" class="calculation-banner">
+            <span class="calc-icon">ℹ️</span>
+            <span id="calcSummaryText">Menghitung perkiraan klip...</span>
+          </div>
+        </div>
+
+        <!-- Mode Portrait 9:16 -->
+        <div class="setting-section">
+          <label class="section-label">Pilihan Mode Portrait 9:16 (Target 1080×1920):</label>
+          <div class="mode-cards">
+            <label class="mode-card selected" data-mode="cinematic_blur">
+              <input type="radio" name="portraitMode" value="cinematic_blur" checked>
+              <div class="mode-card-header">
+                <strong>Mode B — Cinematic Blur</strong>
+                <span class="badge badge-accent">Direkomendasikan</span>
+              </div>
+              <p>Background video blur estetis dengan foreground video proporsional di tengah tanpa melar/gepeng.</p>
+            </label>
+
+            <label class="mode-card" data-mode="template_frame">
+              <input type="radio" name="portraitMode" value="template_frame">
+              <div class="mode-card-header">
+                <strong>Mode D — Template Frame</strong>
+                <span class="badge badge-info">VideoTemplate</span>
+              </div>
+              <p>Bingkai template PNG (dari folder Template) dengan posisi video &amp; teks presisi.</p>
+            </label>
+
+            <label class="mode-card" data-mode="center_crop">
+              <input type="radio" name="portraitMode" value="center_crop">
+              <div class="mode-card-header">
+                <strong>Mode A — Center Crop</strong>
+              </div>
+              <p>Crop video dari sisi kiri &amp; kanan memenuhi layar 9:16 secara penuh.</p>
+            </label>
+
+            <label class="mode-card" data-mode="fit_portrait">
+              <input type="radio" name="portraitMode" value="fit_portrait">
+              <div class="mode-card-header">
+                <strong>Mode C — Fit to Portrait</strong>
+              </div>
+              <p>Video landscape ditampilkan utuh tanpa crop dengan background solid hitam.</p>
+            </label>
+          </div>
+        </div>
+
+        <!-- Detail Template Frame (Khusus Mode D) -->
+        <div id="templateOptionsBox" class="sub-panel hidden">
+          <h4 class="sub-panel-title">Pilihan Bingkai Template PNG</h4>
+          <div class="control-group">
+            <label for="templateSelect">Pilih Template Frame:</label>
+            <select id="templateSelect" class="form-select">
+              {% for t in templates %}
+              <option value="{{ t.filename }}">{{ t.name }} ({{ t.filename }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <p class="input-hint mt-1">Menggunakan template PNG dari <code>Template/</code> atau <code>/data/data/com.termux/files/home/VideoTemplate/Template</code>.</p>
+        </div>
+
+        <!-- Detail Cinematic Blur (Khusus Mode B) -->
+        <div id="cinematicOptionsBox" class="sub-panel">
+          <h4 class="sub-panel-title">Pengaturan Cinematic Blur Background</h4>
+          <div class="grid-controls">
+            <div class="control-group">
+              <label for="blurIntensity">Blur Intensity: <span id="valBlur" class="val-badge">20</span></label>
+              <input type="range" id="blurIntensity" min="5" max="40" value="20">
+            </div>
+            <div class="control-group">
+              <label for="bgBrightness">Background Brightness: <span id="valBrightness" class="val-badge">-0.15</span></label>
+              <input type="range" id="bgBrightness" min="-0.4" max="0.2" step="0.05" value="-0.15">
+            </div>
+            <div class="control-group">
+              <label for="bgSaturation">Background Saturation: <span id="valSat" class="val-badge">1.2</span></label>
+              <input type="range" id="bgSaturation" min="0.5" max="2.0" step="0.1" value="1.2">
+            </div>
+            <div class="control-group">
+              <label for="bgContrast">Background Contrast: <span id="valCont" class="val-badge">1.1</span></label>
+              <input type="range" id="bgContrast" min="0.8" max="1.5" step="0.05" value="1.1">
+            </div>
+            <div class="control-group">
+              <label for="fgScale">Foreground Scale: <span id="valScale" class="val-badge">1.0</span></label>
+              <input type="range" id="fgScale" min="0.7" max="1.0" step="0.05" value="1.0">
+            </div>
+            <div class="control-group">
+              <label for="fgPosition">Posisi Foreground:</label>
+              <select id="fgPosition" class="form-select">
+                <option value="center" selected>Tengah Layar (Center)</option>
+                <option value="top">Agak ke Atas (Top-third)</option>
+                <option value="bottom">Agak ke Bawah (Bottom-third)</option>
+              </select>
+            </div>
+          </div>
+          <div class="checkbox-row mt-2">
+            <label class="custom-checkbox">
+              <input type="checkbox" id="bgVignette" checked>
+              <span>Tambahkan efek Vignette pada background (memberi kedalaman cinematic)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Pengaturan Judul Postingan / Teks Atas Video (Header) -->
+        <div id="headerTitleBox" class="sub-panel mt-3">
+          <div class="checkbox-row mb-2">
+            <label class="custom-checkbox">
+              <input type="checkbox" id="headerTitleEnabled" checked>
+              <strong>📌 Tampilkan Judul Postingan di Atas Video (Header)</strong>
+            </label>
+          </div>
+          <div id="headerTitleControlsGrid" class="grid-controls">
+            <div class="control-group">
+              <label for="headerTitleText">Input Judul Postingan (Opsional):</label>
+              <input type="text" id="headerTitleText" class="form-input" placeholder="Ketik judul (kosongkan = otomatis dari video)...">
+            </div>
+            <div class="control-group">
+              <label for="headerTitleTemplate">Format Judul:</label>
+              <select id="headerTitleTemplate" class="form-select">
+                <option value="{title}" selected>{title} (Judul Video Saja)</option>
+                <option value="{title} - PART {n}">{title} - PART {n} (Judul &amp; Part)</option>
+                <option value="PART {n}">PART {n} (Contoh: PART 1, PART 2)</option>
+                <option value="PART {n} / {total}">PART {n} / {total} (Contoh: PART 1 / 4)</option>
+                <option value="custom">Format Kustom...</option>
+              </select>
+            </div>
+            <div id="headerTitleCustomBox" class="control-group hidden">
+              <label for="headerTitleCustom">Judul Kustom ({n} = nomor, {total} = jumlah):</label>
+              <input type="text" id="headerTitleCustom" class="form-input" placeholder="Contoh: {title} | EPISODE {n}">
+            </div>
+            <div class="control-group">
+              <label for="headerTitlePosition">Posisi di Atas Video:</label>
+              <select id="headerTitlePosition" class="form-select">
+                <option value="above_video" selected>Tepat di Atas Video (Rekomendasi)</option>
+                <option value="top_center">Tengah Area Atas (Header Center)</option>
+                <option value="top_margin">Dekat Batas Atas (Top Margin)</option>
+              </select>
+            </div>
+            <div class="control-group">
+              <label for="headerTitleFontSize">Ukuran Font Judul: <span id="valHeaderTitleFontSize" class="val-badge">59 px</span></label>
+              <input type="range" id="headerTitleFontSize" min="36" max="110" step="2" value="59">
+            </div>
+            <div class="control-group">
+              <label for="headerTitleStyle">Gaya Teks Judul:</label>
+              <select id="headerTitleStyle" class="form-select">
+                <option value="default" selected>Putih + Border Hitam 3px (VideoTemplate)</option>
+                <option value="box_border">Pill Box Gelap + Border</option>
+                <option value="outline">Hanya Outline Hitam Tebal</option>
+                <option value="box">Pill Box Gelap Transparan Saja</option>
+              </select>
+            </div>
+          </div>
+          <p class="input-hint mt-1">Judul akan otomatis di-wrap dan diletakkan di area atas video persis di atas frame video utama.</p>
+        </div>
+
+        <!-- Pengaturan Watermark / Teks PART Bawah Video -->
+        <div id="partLabelBox" class="sub-panel mt-3">
+          <div class="checkbox-row mb-2">
+            <label class="custom-checkbox">
+              <input type="checkbox" id="partEnabled" checked>
+              <strong>🏷️ Tampilkan Teks "PART" / Hook Caption Layar</strong>
+            </label>
+          </div>
+          <div id="partControlsGrid" class="grid-controls">
+            <div class="control-group">
+              <label for="partTemplate">Format Teks:</label>
+              <select id="partTemplate" class="form-select">
+                <option value="PART {n}" selected>PART {n} (Contoh: PART 1, PART 2)</option>
+                <option value="PART {n} / {total}">PART {n} / {total} (Contoh: PART 1 / 4)</option>
+                <option value="{title} - PART {n}">{title} - PART {n} (Judul &amp; Part)</option>
+                <option value="{caption} - PART {n}">{caption} - PART {n} (Hook &amp; Part)</option>
+                <option value="{title}">Judul Video Saja</option>
+                <option value="{caption}">Hook Caption Saja</option>
+                <option value="Part {n}">Part {n} (Contoh: Part 1, Part 2)</option>
+                <option value="EPISODE {n}">EPISODE {n} (Contoh: EPISODE 1)</option>
+                <option value="custom">Format Kustom...</option>
+              </select>
+            </div>
+            <div id="partCustomTemplateBox" class="control-group hidden">
+              <label for="partCustomTemplate">Teks Kustom ({n} = nomor, {total} = jumlah):</label>
+              <input type="text" id="partCustomTemplate" class="form-input" value="PART {n}">
+            </div>
+            <div class="control-group">
+              <label for="partCustomCaption">Hook Caption Layar (Opsional):</label>
+              <input type="text" id="partCustomCaption" class="form-input" placeholder="Teks hook layar (otomatis di-wrap)...">
+            </div>
+            <div class="control-group">
+              <label for="partFontSize">Ukuran Font Dasar: <span id="valPartFontSize" class="val-badge">59 px</span></label>
+              <input type="range" id="partFontSize" min="40" max="110" step="2" value="59">
+            </div>
+            <div class="control-group">
+              <label for="partStyle">Gaya Teks:</label>
+              <select id="partStyle" class="form-select">
+                <option value="default" selected>Putih + Border Hitam 3px (VideoTemplate)</option>
+                <option value="box_border">Pill Box Gelap + Border</option>
+                <option value="outline">Hanya Outline Hitam Tebal</option>
+                <option value="box">Pill Box Gelap Transparan Saja</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group mt-2 mb-0">
+            <label for="partFontPath" class="form-label" style="font-size:0.8rem;">Path Font (.otf / .ttf):</label>
+            <input type="text" id="partFontPath" class="form-input" value="/data/data/com.termux/files/home/VideoTemplate/junction.bold.otf">
+          </div>
+          <div class="notice-box mt-2 py-2" style="font-size:0.82rem; background:rgba(0,180,216,0.1); border-left:3px solid #00b4d8; padding:8px 12px; border-radius:4px;">
+            <span>📐 <strong>Tata Letak VideoTemplate:</strong> Teks diposisikan di 18% dari bawah dengan font Junction Bold dan teks dibungkus otomatis (wrap). Video diposisikan presisi di antara batas header atas (28%) dan teks.</span>
+          </div>
+        </div>
+
+        <!-- Accordion Efek Audio -->
+        <details class="accordion-panel mt-3">
+          <summary class="accordion-header">
+            <span>🎵 Modul Audio Opsional</span>
+            <span class="accordion-tag">Kustomisasi</span>
+          </summary>
+          <div class="accordion-content">
+            <div class="checkbox-row mb-3">
+              <label class="custom-checkbox">
+                <input type="checkbox" id="audioEnabled" checked>
+                <strong>Aktifkan Pemrosesan Audio FFmpeg</strong>
+              </label>
+            </div>
+            <div id="audioControlsGrid" class="grid-controls">
+              <div class="control-group">
+                <label for="audioVolume">Volume / Gain (dB): <span id="valAudioVol" class="val-badge">0 dB</span></label>
+                <input type="range" id="audioVolume" min="-12" max="12" step="1" value="0">
+              </div>
+              <div class="control-group">
+                <label for="audioFadeIn">Fade In Durasi (detik):</label>
+                <input type="number" id="audioFadeIn" min="0" max="5" step="0.5" value="0">
+              </div>
+              <div class="control-group">
+                <label for="audioFadeOut">Fade Out Durasi (detik):</label>
+                <input type="number" id="audioFadeOut" min="0" max="5" step="0.5" value="0">
+              </div>
+              <div class="control-group">
+                <label for="audioPitch">Creative Pitch: <span id="valAudioPitch" class="val-badge">1.00x</span></label>
+                <input type="range" id="audioPitch" min="0.85" max="1.15" step="0.02" value="1.0">
+              </div>
+              <div class="control-group">
+                <label for="audioBass">Bass Boost (dB): <span id="valBass" class="val-badge">0 dB</span></label>
+                <input type="range" id="audioBass" min="-10" max="10" step="1" value="0">
+              </div>
+              <div class="control-group">
+                <label for="audioTreble">Treble Boost (dB): <span id="valTreble" class="val-badge">0 dB</span></label>
+                <input type="range" id="audioTreble" min="-10" max="10" step="1" value="0">
+              </div>
+            </div>
+            <div class="checkbox-grid mt-2">
+              <label class="custom-checkbox">
+                <input type="checkbox" id="audioLoudnorm">
+                <span>Loudness Normalization EBU R128 (standar audio Reels rata &amp; jernih)</span>
+              </label>
+              <label class="custom-checkbox">
+                <input type="checkbox" id="audioNoiseRed">
+                <span>Noise Reduction (FFmpeg afftdn filter)</span>
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <!-- Accordion Efek Visual -->
+        <details class="accordion-panel mt-3">
+          <summary class="accordion-header">
+            <span>✨ Modul Efek Visual Kreatif</span>
+            <span class="accordion-tag">Kustomisasi</span>
+          </summary>
+          <div class="accordion-content">
+            <div class="checkbox-row mb-3">
+              <label class="custom-checkbox">
+                <input type="checkbox" id="visualEnabled">
+                <strong>Aktifkan Efek Visual Tambahan</strong>
+              </label>
+            </div>
+            <div id="visualControlsGrid" class="grid-controls">
+              <div class="control-group">
+                <label for="visBright">Brightness: <span id="valVisBright" class="val-badge">0.00</span></label>
+                <input type="range" id="visBright" min="-0.2" max="0.2" step="0.02" value="0.0">
+              </div>
+              <div class="control-group">
+                <label for="visCont">Contrast: <span id="valVisCont" class="val-badge">1.00</span></label>
+                <input type="range" id="visCont" min="0.7" max="1.4" step="0.05" value="1.0">
+              </div>
+              <div class="control-group">
+                <label for="visSat">Saturation: <span id="valVisSat" class="val-badge">1.00</span></label>
+                <input type="range" id="visSat" min="0.5" max="1.8" step="0.05" value="1.0">
+              </div>
+              <div class="control-group">
+                <label for="glitchIntensity">Glitch Intensity: <span id="valGlitch" class="val-badge">30</span></label>
+                <input type="range" id="glitchIntensity" min="10" max="60" step="5" value="30">
+              </div>
+            </div>
+            <div class="checkbox-grid mt-2">
+              <label class="custom-checkbox">
+                <input type="checkbox" id="visSharpen">
+                <span>Sharpen Filter (menajamkan detail video)</span>
+              </label>
+              <label class="custom-checkbox">
+                <input type="checkbox" id="visVignette">
+                <span>Vignette (bingkai gelap halus di sudut video)</span>
+              </label>
+              <label class="custom-checkbox">
+                <input type="checkbox" id="visFilmLook">
+                <span>Cinematic / Film Look (warna hangat &amp; kontras film)</span>
+              </label>
+              <label class="custom-checkbox">
+                <input type="checkbox" id="visSubtleZoom">
+                <span>Slow Zoom In (efek gerakan Ken Burns halus)</span>
+              </label>
+              <label class="custom-checkbox">
+                <input type="checkbox" id="visGlitch">
+                <span>Creative Glitch Effect (transisi distorsi warna berkala)</span>
+              </label>
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Step 4: Informasi Lisensi & Hak Cipta -->
+    <section id="copyrightCard" class="card hidden">
+      <div class="card-header">
+        <span class="step-num">4</span>
+        <h2>Informasi Lisensi &amp; Hak Cipta</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="licenseStatus" class="form-label">Status Hak Cipta / Izin Konten:</label>
+          <select id="licenseStatus" class="form-select">
+            <option value="Konten milik sendiri">Konten milik sendiri</option>
+            <option value="Memiliki izin">Memiliki izin resmi dari pemilik</option>
+            <option value="Memiliki lisensi">Memiliki lisensi penggunaan</option>
+            <option value="Creative Commons">Creative Commons (CC-BY / Reuse)</option>
+            <option value="Domain publik">Domain publik</option>
+            <option value="Belum diketahui" selected>Belum diketahui</option>
+          </select>
+        </div>
+        <div class="notice-box">
+          <div class="notice-icon">⚠️</div>
+          <div class="notice-text">
+            <strong>Peringatan Kebijakan:</strong> Keberadaan video di YouTube tidak secara otomatis berarti bebas hak cipta. Penggunaan klip untuk Facebook Reels tunduk pada Content ID dan kebijakan hak cipta masing-masing platform.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 5: Form Metadata post_meta.json -->
+    <section id="metadataCard" class="card hidden">
+      <div class="card-header">
+        <span class="step-num">5</span>
+        <h2>Formulir Metadata (post_meta.json)</h2>
+      </div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="metaTitle" class="form-label">Judul Postingan (post_title):</label>
+          <input type="text" id="metaTitle" class="form-input" placeholder="Judul menarik untuk Facebook Reels">
+        </div>
+        <div class="form-group">
+          <label for="metaSummary" class="form-label">Ringkasan Konten (summary):</label>
+          <textarea id="metaSummary" class="form-textarea" rows="3" placeholder="Ringkasan isi video dalam 1-2 kalimat"></textarea>
+        </div>
+        <div class="form-group">
+          <label for="metaHashtags" class="form-label">Hashtags (pisahkan dengan koma atau spasi):</label>
+          <input type="text" id="metaHashtags" class="form-input" placeholder="#ReelsID #VideoKreatif #Viral">
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="metaCta" class="form-label">Call to Action (cta):</label>
+            <input type="text" id="metaCta" class="form-input" placeholder="Tulis pendapatmu di komentar!">
+          </div>
+          <div class="form-group">
+            <label for="metaImageCount" class="form-label">Jumlah Gambar Tambahan (image_count):</label>
+            <input type="number" id="metaImageCount" class="form-input" value="0" min="0">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="metaFolderName" class="form-label">Nama Folder Hasil (Post/&lt;nama-folder&gt;):</label>
+          <input type="text" id="metaFolderName" class="form-input" placeholder="nama-folder-reels">
+          <span class="input-hint">Akan disanitasi otomatis agar aman untuk Windows, Linux, dan Android. Jika sudah ada, sistem otomatis menambah akhiran _02, _03, dst.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 6: Action Bar & Live Progress Bar -->
+    <section id="actionCard" class="card hidden">
+      <div class="action-bar">
+        <button id="btnStartProcess" class="btn btn-action btn-large">
+          <span class="btn-icon">⚡</span> Mulai Proses (Download &amp; Buat Reels)
+        </button>
+        <button id="btnCancelProcess" class="btn btn-danger btn-large hidden">
+          <span class="btn-icon">⏹</span> Batalkan Proses
+        </button>
+      </div>
+
+      <!-- Live Progress Container -->
+      <div id="progressContainer" class="progress-container hidden">
+        <div class="progress-info">
+          <span id="currentStepText" class="progress-step-text">Memulai...</span>
+          <span id="progressPercentBadge" class="progress-percent">0%</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="progressBarFill" class="progress-bar-fill" style="width: 0%"></div>
+        </div>
+        <div id="clipCounterText" class="clip-counter-text">Menunggu proses pemotongan...</div>
+
+        <!-- Collapsible Terminal Log -->
+        <div class="terminal-card mt-3">
+          <div class="terminal-header">
+            <span>💻 Log Proses Backend</span>
+            <button id="btnClearLog" class="btn btn-sm">Bersihkan</button>
+          </div>
+          <pre id="terminalLogs" class="terminal-body"></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 7: Results Card -->
+    <section id="resultsCard" class="card hidden">
+      <div class="card-header bg-success-header">
+        <span class="step-num">✓</span>
+        <h2>Hasil Pembuatan Facebook Reels</h2>
+      </div>
+      <div class="card-body">
+        <div class="results-toolbar">
+          <div id="resultsSummaryText" class="results-stat">
+            Berhasil membuat <strong>0 klip</strong> di folder <code>Post/</code>
+          </div>
+          <div class="results-actions">
+            <button id="btnOpenFolder" class="btn btn-secondary">
+              <span class="btn-icon">📂</span> Buka Folder di Sistem
+            </button>
+            <a id="btnDownloadZip" href="#" class="btn btn-primary">
+              <span class="btn-icon">📦</span> Unduh Semua (.ZIP)
+            </a>
+            <button id="btnNewProcess" class="btn btn-secondary">
+              <span class="btn-icon">🔄</span> Buat Video Baru
+            </button>
+          </div>
+        </div>
+
+        <!-- Video Clips Grid -->
+        <h3 class="subsection-title mt-3">Daftar Klip Portrait 9:16 Siap Upload:</h3>
+        <div id="clipsGrid" class="clips-grid">
+          <!-- Dynamic Clips items rendered by JS -->
+        </div>
+
+        <!-- Metadata Viewer -->
+        <h3 class="subsection-title mt-4">Isi File Metadata <code>post_meta.json</code>:</h3>
+        <div class="meta-json-box">
+          <pre id="metaJsonDisplay" class="json-viewer"></pre>
+          <button id="btnCopyJson" class="btn btn-sm btn-secondary copy-btn">Salin JSON</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <footer class="app-footer">
+    <p>YouTube to Facebook Reels Generator • Powered by yt-dlp &amp; FFmpeg</p>
+  </footer>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>

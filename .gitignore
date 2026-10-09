@@ -1,0 +1,89 @@
+# ====================================================================
+# Git Ignore for YouTube to Facebook Reels Generator
+# ====================================================================
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Project output & media storage (keep directories via .gitkeep)
+/downloads/*
+!/downloads/.gitkeep
+
+/temp/*
+!/temp/.gitkeep
+
+/Post/*
+!/Post/.gitkeep
+
+/Template/*
+!/Template/.gitkeep
+
+# Video & Audio files (prevent accidental commit of large media)
+*.mp4
+*.mkv
+*.webm
+*.avi
+*.mov
+*.flv
+*.ts
+*.m4a
+*.mp3
+*.wav
+*.aac
+
+# Partial downloads & downloader cache
+*.part
+*.ytdl
+*.temp
+*.tmp
+*.uploadedfb
+
+# Secrets, Credentials & Local configurations
+.env
+.env.*
+*.env
+cookies.txt
+*.token
+*.key
+
+# Logs
+*.log
+logs/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# IDEs & Code Editors
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# Operating System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
